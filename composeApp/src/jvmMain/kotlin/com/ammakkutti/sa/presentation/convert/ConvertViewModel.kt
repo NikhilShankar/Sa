@@ -284,6 +284,8 @@ class ConvertViewModel {
                 val filesToProcess = videosToProcess + imagesToProcess
                 val totalOriginalSize = filesToProcess.sumOf { it.sizeBytes }
 
+                println("🔍 DEBUG: Starting optimization - ${videosToProcess.size} videos, ${imagesToProcess.size} images")
+
                 // Initialize conversion statistics
                 val initialStats = ConversionStats(
                     totalFiles = filesToProcess.size,
@@ -304,9 +306,11 @@ class ConvertViewModel {
                 var totalCompressedSize = 0L
                 val completedFiles = mutableListOf<FileConversionStats>()
 
-                // Process each file
-                filesToProcess.forEachIndexed { index, file ->
+                // Process each file sequentially and wait for completion
+                for ((index, file) in filesToProcess.withIndex()) {
                     val fileStartTime = System.currentTimeMillis()
+
+                    println("🔍 DEBUG: Processing file ${index + 1}/${filesToProcess.size}: ${file.name}")
 
                     // Create initial file stats
                     val initialFileStats = FileConversionStats(
@@ -318,9 +322,9 @@ class ConvertViewModel {
                     // Update state to show current file
                     handleIntent(ConvertIntent.StartFileConversion(initialFileStats))
 
-                    if (file.isVideo) {
+                    val completedFileStats = if (file.isVideo) {
                         // Process video
-                        val outputPath = generateOptimizedOutputPath(file, isVideo = true)
+                        val outputPath = generateOptimizedOutputPath(file, isVideo = true, settings = settings)
 
                         val result = ffmpegService.compressVideo(
                             inputPath = file.path,
@@ -338,7 +342,7 @@ class ConvertViewModel {
 
                         // Complete file processing
                         val processingTime = System.currentTimeMillis() - fileStartTime
-                        val completedFileStats = when (result) {
+                        when (result) {
                             is CompressionResult.Success -> {
                                 totalCompressedSize += result.compressedSize
                                 FileConversionStats(
@@ -351,6 +355,7 @@ class ConvertViewModel {
                                 )
                             }
                             is CompressionResult.Error -> {
+                                totalCompressedSize += file.sizeBytes // Keep original size if failed
                                 FileConversionStats(
                                     fileName = file.name,
                                     originalSize = file.sizeBytes,
@@ -359,34 +364,43 @@ class ConvertViewModel {
                                 )
                             }
                         }
-
-                        completedFiles.add(completedFileStats)
-                        handleIntent(ConvertIntent.CompleteFileConversion(completedFileStats))
-
                     } else {
-                        // Process image - FIXED
+                        // Process image - WAIT for completion
                         _state.update { it.copy(currentFile = "Optimizing ${file.name}") }
 
-                        val completedFileStats = processImageFile(file, settings) // Changed from imageFile to file
-
+                        val imageResult = processImageFile(file, settings)
                         val processingTime = System.currentTimeMillis() - fileStartTime
-                        val updatedStats = completedFileStats.copy(processingTimeMs = processingTime)
+                        val finalImageStats = imageResult.copy(processingTimeMs = processingTime)
 
-                        if (completedFileStats.status == ConversionStatus.COMPLETED) {
-                            totalCompressedSize += completedFileStats.compressedSize
+                        if (finalImageStats.status == ConversionStatus.COMPLETED) {
+                            totalCompressedSize += finalImageStats.compressedSize
                         } else {
-                            totalCompressedSize += file.sizeBytes // Changed from imageFile to file
+                            totalCompressedSize += file.sizeBytes
                         }
 
-                        completedFiles.add(updatedStats)
-                        handleIntent(ConvertIntent.CompleteFileConversion(updatedStats))
+                        // Update overall progress for images too
+                        val overallProgress = (index + 1).toFloat() / filesToProcess.size
+                        _state.update {
+                            it.copy(conversionProgress = overallProgress)
+                        }
+
+                        finalImageStats
                     }
+
+                    completedFiles.add(completedFileStats)
+                    //handleIntent(ConvertIntent.CompleteFileConversion(completedFileStats))
 
                     // Update overall statistics
                     val spaceSaved = totalOriginalSize - totalCompressedSize
                     val avgCompressionRatio = if (completedFiles.isNotEmpty()) {
-                        completedFiles.map { it.compressionRatio }.average().toFloat()
+                        completedFiles.filter { it.compressionRatio > 0 }.map { it.compressionRatio }.average().toFloat()
                     } else 0f
+
+                    val timeEstimate = calculateTimeEstimate(
+                        completedFiles.size,
+                        filesToProcess.size,
+                        initialStats.conversionStartTime
+                    )
 
                     val updatedStats = _state.value.conversionStats.copy(
                         completedFiles = completedFiles.size,
@@ -394,26 +408,40 @@ class ConvertViewModel {
                         totalCompressedSize = totalCompressedSize,
                         totalSpaceSaved = spaceSaved,
                         averageCompressionRatio = avgCompressionRatio,
-                        completedFileStats = completedFiles.toList()
+                        completedFileStats = completedFiles.toList(),
+                        estimatedTimeRemaining = timeEstimate
                     )
 
                     handleIntent(ConvertIntent.UpdateOverallStats(updatedStats))
+
+                    println("🔍 DEBUG: Completed file ${index + 1}/${filesToProcess.size}: ${completedFileStats.status}")
                 }
 
-                // Conversion completed
-                _state.update {
-                    it.copy(
-                        isConverting = false,
-                        conversionProgress = 1f,
-                        currentFile = "Optimization completed!"
-                    )
-                }
+                // ALL FILES PROCESSED - Now complete the conversion
+                println("🔍 DEBUG: All files processed, calling conversionCompleted")
+                handleIntent(ConvertIntent.ConversionCompleted)
 
             } catch (e: Exception) {
                 println("Optimization error: ${e.message}")
+                e.printStackTrace()
                 _state.update { it.copy(isConverting = false) }
             }
         }
+    }
+
+    // Time estimation method
+    private fun calculateTimeEstimate(
+        completedFiles: Int,
+        totalFiles: Int,
+        startTime: Long
+    ): Long {
+        if (completedFiles == 0) return 0
+
+        val elapsedTime = System.currentTimeMillis() - startTime
+        val averageTimePerFile = elapsedTime / completedFiles
+        val remainingFiles = totalFiles - completedFiles
+
+        return (remainingFiles * averageTimePerFile) / 1000 // Convert to seconds
     }
 
     private fun generateOptimizedOutputPath(file: VideoFile, isVideo: Boolean, settings: OptimizationSettings? = null): String {

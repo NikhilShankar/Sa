@@ -2,6 +2,8 @@ package com.ammakkutti.sa.presentation.convert
 
 import com.ammakkutti.sa.domain.model.ConversionHistory
 import com.ammakkutti.sa.domain.model.VideoFile
+import kotlinx.serialization.Serializable
+import java.io.Serial
 
 data class ConvertState(
     val selectedFolder: String? = null,
@@ -84,6 +86,7 @@ enum class SortOption {
 }
 
 // Your existing OptimizationSettings and other classes...
+@Serializable
 data class OptimizationSettings(
     // Video settings
     val enableVideoCompression: Boolean = true,
@@ -98,12 +101,14 @@ data class OptimizationSettings(
     val imageQuality: Int = 90
 )
 
+@Serializable
 enum class VideoQualityPreset(val displayName: String, val crf: Int, val preset: String) {
     HIGH_QUALITY("High Quality", 18, "slow"),
     BALANCED("Balanced", 23, "medium"),
     SMALL_SIZE("Small Size", 28, "fast")
 }
 
+@Serializable
 enum class ImageFormat(val displayName: String, val extension: String) {
     KEEP_ORIGINAL("Keep Original", ""),
     JPEG("JPEG", "jpg"),
