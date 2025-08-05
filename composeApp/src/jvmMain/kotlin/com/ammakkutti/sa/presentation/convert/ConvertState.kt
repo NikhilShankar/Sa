@@ -98,7 +98,10 @@ data class OptimizationSettings(
     val imageFormat: ImageFormat = ImageFormat.JPEG,
     val resizeLargeImages: Boolean = true,
     val maxImageSize: Int = 2000,
-    val imageQuality: Int = 90
+    val imageQuality: Int = 90,
+
+    // NEW: Other files settings
+    val copyOtherFiles: Boolean = true // Copy documents, text files, etc.
 )
 
 @Serializable

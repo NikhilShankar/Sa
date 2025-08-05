@@ -20,6 +20,7 @@ fun OptimizationDialog(
     settings: OptimizationSettings,
     videoCount: Int,
     imageCount: Int,
+    otherFileCount: Int,
     onSettingsChange: (OptimizationSettings) -> Unit,
     onStartOptimization: () -> Unit,
     onDismiss: () -> Unit
@@ -63,6 +64,16 @@ fun OptimizationDialog(
                 ImageOptimizationSection(
                     settings = settings,
                     imageCount = imageCount,
+                    onSettingsChange = onSettingsChange
+                )
+
+                // Add this after the ImageOptimizationSection in OptimizationDialog
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+// Other Files Section
+                OtherFilesSection(
+                    settings = settings,
+                    otherFileCount = otherFileCount, // You'll need to pass this count
                     onSettingsChange = onSettingsChange
                 )
 
@@ -223,5 +234,37 @@ private fun ImageOptimizationSection(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OtherFilesSection(
+    settings: OptimizationSettings,
+    otherFileCount: Int,
+    onSettingsChange: (OptimizationSettings) -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = settings.copyOtherFiles,
+            onCheckedChange = {
+                onSettingsChange(settings.copy(copyOtherFiles = it))
+            }
+        )
+        Text(
+            text = "Copy Other Files ($otherFileCount files)",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Medium
+        )
+    }
+
+    if (settings.copyOtherFiles) {
+        Text(
+            text = "Documents, text files, and other non-media files will be copied as-is",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 32.dp, top = 4.dp)
+        )
     }
 }

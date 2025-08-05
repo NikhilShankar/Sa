@@ -118,11 +118,13 @@ fun ConvertScreen(viewModel: ConvertViewModel) {
     if (state.showOptimizationDialog) {
         val videoCount = state.mediaFiles.count { it.isVideo }
         val imageCount = state.mediaFiles.count { it.isImage }
+        val otherFileCount = state.mediaFiles.count { it.isOtherFile }
 
         OptimizationDialog(
             settings = state.optimizationSettings,
             videoCount = videoCount,
             imageCount = imageCount,
+            otherFileCount = otherFileCount,
             onSettingsChange = {
                 viewModel.handleIntent(ConvertIntent.UpdateOptimizationSettings(it))
             },
