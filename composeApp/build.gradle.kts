@@ -11,7 +11,7 @@ plugins {
 
 kotlin {
     jvm()
-    
+
     sourceSets {
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -49,6 +49,10 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "com.ammakkutti.sa"
             packageVersion = "1.0.0"
+        }
+
+        nativeDistributions {
+            targetFormats(TargetFormat.Exe)
         }
     }
 }
