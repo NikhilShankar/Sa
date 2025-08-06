@@ -46,13 +46,9 @@ compose.desktop {
         mainClass = "com.ammakkutti.sa.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)
             packageName = "com.ammakkutti.sa"
             packageVersion = "1.0.0"
-        }
-
-        nativeDistributions {
-            targetFormats(TargetFormat.Exe)
         }
     }
 }
