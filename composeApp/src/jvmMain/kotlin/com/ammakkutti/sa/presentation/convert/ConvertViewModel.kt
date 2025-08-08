@@ -3,10 +3,14 @@ import com.ammakkutti.sa.data.services.ConversionHistoryService
 import com.ammakkutti.sa.data.services.FFmpegService
 import com.ammakkutti.sa.data.services.FileCopyResult
 import com.ammakkutti.sa.data.services.FileCopyService
+import com.ammakkutti.sa.data.services.FolderComparison
+import com.ammakkutti.sa.data.services.FolderComparisonResult
+import com.ammakkutti.sa.data.services.FolderComparisonService
 import com.ammakkutti.sa.data.services.ImageCompressionResult
 import com.ammakkutti.sa.data.services.ImageCompressionService
 import com.ammakkutti.sa.domain.model.ConversionHistory
 import com.ammakkutti.sa.domain.model.VideoFile
+import com.ammakkutti.sa.presentation.convert.ComparisonViewFilter
 import com.ammakkutti.sa.presentation.convert.ConversionStats
 import com.ammakkutti.sa.presentation.convert.ConversionStatus
 import com.ammakkutti.sa.presentation.convert.ConvertIntent
@@ -35,6 +39,7 @@ class ConvertViewModel {
     private val ffmpegService = FFmpegService() // Add this line
     private val historyService = ConversionHistoryService() // NEW
     private val fileCopyService = FileCopyService() // NEW
+    private val folderComparisonService = FolderComparisonService() // NEW
 
     private val _state = MutableStateFlow(ConvertState())
     val state: StateFlow<ConvertState> = _state.asStateFlow()
@@ -71,6 +76,19 @@ class ConvertViewModel {
             is ConvertIntent.HideHistory -> hideHistory()
             is ConvertIntent.LoadHistory -> loadHistory()
             is ConvertIntent.HistoryLoaded -> historyLoaded(intent.history)
+
+            // NEW: Folder comparison handlers
+            is ConvertIntent.ShowFolderComparisonDialog -> showFolderComparisonDialog()
+            is ConvertIntent.HideFolderComparisonDialog -> hideFolderComparisonDialog()
+            is ConvertIntent.SelectSourceComparisonFolder -> selectSourceComparisonFolder(intent.path)
+            is ConvertIntent.SelectDestinationComparisonFolder -> selectDestinationComparisonFolder(intent.path)
+            is ConvertIntent.StartFolderComparison -> startFolderComparison()
+            is ConvertIntent.ComparisonProgress -> updateComparisonProgress(intent.progress)
+            is ConvertIntent.ComparisonCompleted -> comparisonCompleted(intent.comparison)
+            is ConvertIntent.ComparisonError -> comparisonError(intent.message)
+            is ConvertIntent.ShowComparisonResults -> showComparisonResults()
+            is ConvertIntent.HideComparisonResults -> hideComparisonResults()
+            is ConvertIntent.ChangeComparisonFilter -> changeComparisonFilter(intent.filter)
         }
     }
 
@@ -608,6 +626,7 @@ class ConvertViewModel {
                 processingStats = it.processingStats.also {
 
                     it.add(fileStats.copy(conversionProgress = 0f))
+                    println("NIKHIL : ${it.size} number of elements in the process queue")
                 },
                 conversionStats = it.conversionStats.copy(
                     currentFileStats = fileStats,
@@ -784,6 +803,135 @@ class ConvertViewModel {
             )
         }
         println("🔍 DEBUG: Cleared conversion results, back to welcome screen")
+    }
+
+
+    // NEW: Folder comparison methods
+    private fun showFolderComparisonDialog() {
+        _state.update { it.copy(showFolderComparisonDialog = true) }
+    }
+
+    private fun hideFolderComparisonDialog() {
+        _state.update {
+            it.copy(
+                showFolderComparisonDialog = false,
+                sourceComparisonFolder = null,
+                destinationComparisonFolder = null,
+                comparisonProgress = 0f
+            )
+        }
+    }
+
+    private fun selectSourceComparisonFolder(path: String) {
+        _state.update { it.copy(sourceComparisonFolder = path) }
+    }
+
+    private fun selectDestinationComparisonFolder(path: String) {
+        _state.update { it.copy(destinationComparisonFolder = path) }
+    }
+
+    private fun startFolderComparison() {
+        val currentState = _state.value
+        val sourceFolder = currentState.sourceComparisonFolder
+        val destFolder = currentState.destinationComparisonFolder
+
+        if (sourceFolder == null || destFolder == null) {
+            comparisonError("Please select both source and destination folders")
+            return
+        }
+
+        scope.launch {
+            _state.update {
+                it.copy(
+                    isComparingFolders = true,
+                    comparisonProgress = 0f,
+                    folderComparison = null
+                )
+            }
+
+            try {
+                val result = folderComparisonService.compareFolders(
+                    sourceFolder = sourceFolder,
+                    destinationFolder = destFolder,
+                    onProgress = { progress ->
+                        handleIntent(ConvertIntent.ComparisonProgress(progress))
+                    }
+                )
+
+                when (result) {
+                    is FolderComparisonResult.Success -> {
+                        handleIntent(ConvertIntent.ComparisonCompleted(result.comparison))
+                    }
+                    is FolderComparisonResult.Error -> {
+                        handleIntent(ConvertIntent.ComparisonError(result.message))
+                    }
+                }
+
+            } catch (e: Exception) {
+                handleIntent(ConvertIntent.ComparisonError("Comparison failed: ${e.message}"))
+            }
+        }
+    }
+
+    private fun updateComparisonProgress(progress: Float) {
+        _state.update { it.copy(comparisonProgress = progress) }
+    }
+
+    private fun comparisonCompleted(comparison: FolderComparison) {
+        _state.update {
+            it.copy(
+                isComparingFolders = false,
+                comparisonProgress = 1f,
+                folderComparison = comparison,
+                showComparisonResults = true,
+                showFolderComparisonDialog = false
+            )
+        }
+    }
+
+    private fun comparisonError(message: String) {
+        _state.update {
+            it.copy(
+                isComparingFolders = false,
+                comparisonProgress = 0f
+            )
+        }
+        println("Comparison error: $message")
+    }
+
+    private fun showComparisonResults() {
+        _state.update { it.copy(showComparisonResults = true) }
+    }
+
+    private fun hideComparisonResults() {
+        _state.update {
+            it.copy(
+                showComparisonResults = false,
+                folderComparison = null,
+                comparisonViewFilter = ComparisonViewFilter.ALL
+            )
+        }
+    }
+
+    private fun changeComparisonFilter(filter: ComparisonViewFilter) {
+        _state.update { it.copy(comparisonViewFilter = filter) }
+    }
+
+    // Helper method to select folders for comparison
+    fun selectComparisonFolder(isSourceFolder: Boolean) {
+        val fileChooser = JFileChooser()
+        fileChooser.fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+        fileChooser.dialogTitle = if (isSourceFolder) "Select source folder" else "Select destination folder"
+
+        val result = fileChooser.showOpenDialog(null)
+        if (result == JFileChooser.APPROVE_OPTION) {
+            val selectedPath = fileChooser.selectedFile.absolutePath
+            if (isSourceFolder) {
+                handleIntent(ConvertIntent.SelectSourceComparisonFolder(selectedPath))
+            } else {
+                handleIntent(ConvertIntent.SelectDestinationComparisonFolder(selectedPath))
+            }
+        }
     }
 
 }

@@ -39,6 +39,13 @@ fun ConvertScreen(viewModel: ConvertViewModel) {
 
             // Button group
             Row {
+                // NEW: Folder comparison button
+                Button(
+                    onClick = { viewModel.handleIntent(ConvertIntent.ShowFolderComparisonDialog) },
+                ) {
+                    Text("Compare Folders")
+                }
+                Spacer(Modifier.width(8.dp))
                 // History button
                 Button(
                     onClick = { viewModel.handleIntent(ConvertIntent.ShowHistory) },
@@ -60,6 +67,22 @@ fun ConvertScreen(viewModel: ConvertViewModel) {
 
         HorizontalDivider()
 
+        if(state.showFolderComparisonDialog) {
+                FolderComparisonDialog(
+                    state = state,
+                    onIntent = viewModel::handleIntent,
+                    onSelectSourceFolder = { viewModel.selectComparisonFolder(isSourceFolder = true) },
+                    onSelectDestinationFolder = { viewModel.selectComparisonFolder(isSourceFolder = false) }
+                )
+        }
+
+        if(state.showComparisonResults) {
+            FolderComparisonResults(
+                state = state,
+                onIntent = viewModel::handleIntent
+            )
+        }
+
         // Main Content
         when {
             state.selectedFolder == null -> {
@@ -71,6 +94,8 @@ fun ConvertScreen(viewModel: ConvertViewModel) {
             state.isScanning -> {
                 ScanningContent()
             }
+
+
 
             state.hasCompletedConversion && state.lastConversionStats != null -> {
                 // NEW: Show completion results

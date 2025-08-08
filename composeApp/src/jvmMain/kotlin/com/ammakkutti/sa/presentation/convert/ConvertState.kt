@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import com.ammakkutti.sa.domain.model.ConversionHistory
 import com.ammakkutti.sa.domain.model.VideoFile
+import com.ammakkutti.sa.data.services.FolderComparison
 import kotlinx.serialization.Serializable
 import java.io.Serial
 
@@ -21,19 +22,38 @@ data class ConvertState(
     val showOptimizationDialog: Boolean = false,
     val optimizationSettings: OptimizationSettings = OptimizationSettings(),
 
-    // NEW: Detailed conversion statistics
+    // Detailed conversion statistics
     val conversionStats: ConversionStats = ConversionStats(),
     val processingStats: MutableList<FileConversionStats> = arrayListOf<FileConversionStats>(),
 
-    // NEW: Keep stats after completion
+    // Keep stats after completion
     val hasCompletedConversion: Boolean = false,
     val lastConversionStats: ConversionStats? = null,
 
-    // NEW: History viewing
+    // History viewing
     val showHistoryDialog: Boolean = false,
     val conversionHistory: ConversionHistory = ConversionHistory(),
-    val isLoadingHistory: Boolean = false
+    val isLoadingHistory: Boolean = false,
+
+    // NEW: Folder comparison state
+    val showFolderComparisonDialog: Boolean = false,
+    val sourceComparisonFolder: String? = null,
+    val destinationComparisonFolder: String? = null,
+    val isComparingFolders: Boolean = false,
+    val folderComparison: FolderComparison? = null,
+    val comparisonProgress: Float = 0f,
+    val showComparisonResults: Boolean = false,
+    val comparisonViewFilter: ComparisonViewFilter = ComparisonViewFilter.ALL
 )
+
+// NEW: Filter options for comparison results
+enum class ComparisonViewFilter {
+    ALL,
+    MISSING_IN_DESTINATION,
+    MISSING_IN_SOURCE,
+    DIFFERENT_FILES,
+    IDENTICAL_FILES
+}
 
 data class ConversionStats(
     val totalFiles: Int = 0,
@@ -75,7 +95,6 @@ enum class ConversionStatus {
     PENDING, IN_PROGRESS, COMPLETED, FAILED
 }
 
-// ADD THESE MISSING DATA CLASSES:
 data class FolderNode(
     val name: String,
     val path: String,
@@ -88,7 +107,6 @@ enum class SortOption {
     SIZE_DESC, SIZE_ASC, DATE_DESC, DATE_ASC, NAME_ASC, NAME_DESC
 }
 
-// Your existing OptimizationSettings and other classes...
 @Serializable
 data class OptimizationSettings(
     // Video settings
@@ -103,7 +121,7 @@ data class OptimizationSettings(
     val maxImageSize: Int = 2000,
     val imageQuality: Int = 90,
 
-    // NEW: Other files settings
+    // Other files settings
     val copyOtherFiles: Boolean = true // Copy documents, text files, etc.
 )
 
@@ -129,13 +147,13 @@ sealed class ConvertIntent {
     object StartConversion : ConvertIntent()
     data class ConversionProgress(val progress: Float, val currentFile: String) : ConvertIntent()
 
-    // NEW: Optimization dialog intents
+    // Optimization dialog intents
     object ShowOptimizationDialog : ConvertIntent()
     object HideOptimizationDialog : ConvertIntent()
     data class UpdateOptimizationSettings(val settings: OptimizationSettings) : ConvertIntent()
     object StartOptimization : ConvertIntent()
 
-    // NEW: Statistics tracking intents
+    // Statistics tracking intents
     data class StartFileConversion(val fileStats: FileConversionStats) : ConvertIntent()
     data class UpdateFileProgress(val fileStats: FileConversionStats, val progress: Float) : ConvertIntent()
     data class CompleteFileConversion(val fileStats: FileConversionStats) : ConvertIntent()
@@ -144,11 +162,22 @@ sealed class ConvertIntent {
     object ConversionCompleted: ConvertIntent()
     object ClearConversionResults: ConvertIntent()
 
-    // NEW: History intents
+    // History intents
     object ShowHistory : ConvertIntent()
     object HideHistory : ConvertIntent()
     object LoadHistory : ConvertIntent()
     data class HistoryLoaded(val history: ConversionHistory) : ConvertIntent()
 
+    // NEW: Folder comparison intents
+    object ShowFolderComparisonDialog : ConvertIntent()
+    object HideFolderComparisonDialog : ConvertIntent()
+    data class SelectSourceComparisonFolder(val path: String) : ConvertIntent()
+    data class SelectDestinationComparisonFolder(val path: String) : ConvertIntent()
+    object StartFolderComparison : ConvertIntent()
+    data class ComparisonProgress(val progress: Float) : ConvertIntent()
+    data class ComparisonCompleted(val comparison: FolderComparison) : ConvertIntent()
+    data class ComparisonError(val message: String) : ConvertIntent()
+    object ShowComparisonResults : ConvertIntent()
+    object HideComparisonResults : ConvertIntent()
+    data class ChangeComparisonFilter(val filter: ComparisonViewFilter) : ConvertIntent()
 }
-
