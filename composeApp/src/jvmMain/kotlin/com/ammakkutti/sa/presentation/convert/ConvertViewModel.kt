@@ -58,7 +58,7 @@ class ConvertViewModel {
 
             // NEW: Statistics handlers
             is ConvertIntent.StartFileConversion -> startFileConversion(intent.fileStats)
-            is ConvertIntent.UpdateFileProgress -> updateFileProgress(intent.progress)
+            is ConvertIntent.UpdateFileProgress -> updateFileProgress(intent.fileStats, intent.progress)
             is ConvertIntent.CompleteFileConversion -> completeFileConversion(intent.fileStats)
             is ConvertIntent.UpdateOverallStats -> updateOverallStats(intent.stats)
 
@@ -180,7 +180,7 @@ class ConvertViewModel {
                     val outputPath = generateOutputPath(videoFile)
 
                     _state.update {
-                        it.copy(currentFile = videoFile.name)
+                        it.copy(currentStatus = videoFile.name)
                     }
 
                     val result = ffmpegService.compressVideo(
@@ -206,7 +206,7 @@ class ConvertViewModel {
                     it.copy(
                         isConverting = false,
                         conversionProgress = 1f,
-                        currentFile = "Conversion completed!"
+                        currentStatus = "Conversion completed!"
                     )
                 }
 
@@ -250,7 +250,7 @@ class ConvertViewModel {
         _state.update {
             it.copy(
                 conversionProgress = progress,
-                currentFile = currentFile
+                currentStatus = currentFile
             )
         }
     }
@@ -430,7 +430,7 @@ class ConvertViewModel {
                     outputPath = outputPath,
                     onProgress = { fileProgress ->
                         launch(Dispatchers.Main) {
-                            handleIntent(ConvertIntent.UpdateFileProgress(fileProgress))
+                            handleIntent(ConvertIntent.UpdateFileProgress(initialFileStats, fileProgress))
                         }
                     }
                 )
@@ -462,7 +462,7 @@ class ConvertViewModel {
             file.isImage -> {
                 // Process image
                 launch(Dispatchers.Main) {
-                    _state.update { it.copy(currentFile = "Optimizing ${file.name}") }
+                    _state.update { it.copy(currentStatus = "Optimizing ${file.name}") }
                 }
 
                 val imageResult = processImageFile(file, settings)
@@ -473,7 +473,7 @@ class ConvertViewModel {
             else -> {
                 // NEW: Copy other files
                 launch(Dispatchers.Main) {
-                    _state.update { it.copy(currentFile = "Copying ${file.name}") }
+                    _state.update { it.copy(currentStatus = "Copying ${file.name}") }
                 }
 
                 val copyResult = copyOtherFile(file, settings)
@@ -495,7 +495,6 @@ class ConvertViewModel {
             inputPath = file.path,
             outputPath = outputPath,
             onProgress = { progress ->
-                handleIntent(ConvertIntent.UpdateFileProgress(progress))
             }
         )
 
@@ -579,7 +578,6 @@ class ConvertViewModel {
             outputPath = outputPath,
             settings = settings,
             onProgress = { progress ->
-                handleIntent(ConvertIntent.UpdateFileProgress(progress))
             }
         )
 
@@ -606,28 +604,41 @@ class ConvertViewModel {
     private fun startFileConversion(fileStats: FileConversionStats) {
         _state.update {
             it.copy(
-                currentFile = "Processing ${fileStats.fileName}",
+                currentStatus = "Processing ${fileStats.fileName}",
+                processingStats = it.processingStats.also {
+
+                    it.add(fileStats.copy(conversionProgress = 0f))
+                },
                 conversionStats = it.conversionStats.copy(
                     currentFileStats = fileStats,
-                    currentFileProgress = 0f
                 )
             )
         }
     }
 
-    private fun updateFileProgress(progress: Float) {
-        _state.update {
-            it.copy(
-                conversionStats = it.conversionStats.copy(
-                    currentFileProgress = progress
-                )
-            )
+    private fun updateFileProgress(fileStats: FileConversionStats, progress: Float) {
+        val updatedStats = _state.value.processingStats.map { stat ->
+            if (stat.fileName == fileStats.fileName) {
+                stat.copy(conversionProgress = progress)
+            } else {
+                stat
+            }
         }
+
+        _state.value = _state.value.copy(processingStats = updatedStats as MutableList<FileConversionStats>)
     }
 
     private fun completeFileConversion(fileStats: FileConversionStats) {
         val currentState = _state.value
         val currentStats = currentState.conversionStats
+
+        _state.update {
+            it.copy(
+                processingStats = it.processingStats.also {
+                    it.remove(fileStats)
+                }
+            )
+        }
 
         // Calculate total duration
         val durationMs = System.currentTimeMillis() - currentStats.conversionStartTime
@@ -657,7 +668,7 @@ class ConvertViewModel {
             it.copy(
                 isConverting = false,
                 conversionProgress = 1f,
-                currentFile = "Optimization completed! Results saved to history.",
+                currentStatus = "Optimization completed! Results saved to history.",
                 hasCompletedConversion = true,
                 lastConversionStats = currentStats
             )
@@ -745,7 +756,7 @@ class ConvertViewModel {
             val newState = it.copy(
                 isConverting = false,
                 conversionProgress = 1f,
-                currentFile = "Optimization completed! Results saved to history.",
+                currentStatus = "Optimization completed! Results saved to history.",
                 hasCompletedConversion = true,
                 lastConversionStats = currentStats
             )
@@ -766,7 +777,7 @@ class ConvertViewModel {
                 selectedFolder = null,
                 mediaFiles = emptyList(),
                 folderStructure = emptyList(),
-                currentFile = "",
+                currentStatus = "",
                 conversionProgress = 0f,
                 isConverting = false,
                 isScanning = false

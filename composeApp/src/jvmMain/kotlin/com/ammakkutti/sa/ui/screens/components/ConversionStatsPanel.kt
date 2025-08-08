@@ -20,7 +20,8 @@ import com.ammakkutti.sa.presentation.convert.ConversionStatus
 fun ConversionStatsPanel(
     stats: ConversionStats,
     currentFile: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    processingStats: List<FileConversionStats>?
 ) {
     Card(
         modifier = modifier.fillMaxSize()
@@ -48,11 +49,19 @@ fun ConversionStatsPanel(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Current File Section
-            if (stats.currentFileStats != null) {
+//            // Current File Section
+//            if (stats.currentFileStats != null) {
+//                CurrentFileSection(
+//                    fileStats = stats.currentFileStats,
+//                    progress = stats.currentFileProgress
+//                )
+//                Spacer(modifier = Modifier.height(16.dp))
+//            }
+
+            processingStats?.forEach {
                 CurrentFileSection(
-                    fileStats = stats.currentFileStats,
-                    progress = stats.currentFileProgress
+                    fileStats = it,
+                    progress = it.conversionProgress
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }

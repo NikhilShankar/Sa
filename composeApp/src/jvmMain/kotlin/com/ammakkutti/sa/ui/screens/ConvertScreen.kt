@@ -9,39 +9,24 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.MenuBar
 
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.unit.dp
 import com.ammakkutti.sa.domain.model.VideoFile
 import com.ammakkutti.sa.presentation.convert.ConvertIntent
 import com.ammakkutti.sa.presentation.convert.FolderNode
 import com.ammakkutti.sa.presentation.convert.SortOption
 import com.ammakkutti.sa.ui.screens.components.OptimizationDialog
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
 import androidx.compose.ui.text.font.FontWeight
 import com.ammakkutti.sa.presentation.convert.ConversionStats
+import com.ammakkutti.sa.presentation.convert.FileConversionStats
 import com.ammakkutti.sa.ui.screens.components.ConversionStatsPanel
 import com.ammakkutti.sa.ui.screens.components.ConversionHistoryDialog
+import org.jetbrains.skia.skottie.Logger
 
 @Composable
 fun ConvertScreen(viewModel: ConvertViewModel) {
     val state by viewModel.state.collectAsState()
+    println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  CONVERT SCREEN File conversion stats : ${state.toString()}")
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Top Toolbar
@@ -98,6 +83,7 @@ fun ConvertScreen(viewModel: ConvertViewModel) {
             }
 
             else -> {
+                println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> STATE   File conversion stats : ${state.toString()}")
                 MediaBrowserContent(
                     folderStructure = state.folderStructure,
                     mediaFiles = state.mediaFiles,
@@ -105,7 +91,8 @@ fun ConvertScreen(viewModel: ConvertViewModel) {
                     onSortChange = { viewModel.handleIntent(ConvertIntent.ChangeSortOption(it)) },
                     isConverting = state.isConverting,
                     conversionProgress = state.conversionProgress,
-                    currentFile = state.currentFile,
+                    currentStatus = state.currentStatus ?: "",
+                    processingStats =  state.processingStats,
                     onStartConversion = { viewModel.handleIntent(ConvertIntent.StartConversion) },
                     onShowOptimizationDialog = { viewModel.handleIntent(ConvertIntent.ShowOptimizationDialog) },
                     conversionStats = state.conversionStats // NEW parameter
@@ -188,19 +175,22 @@ private fun MediaBrowserContent(
     onSortChange: (SortOption) -> Unit,
     isConverting: Boolean,
     conversionProgress: Float,
-    currentFile: String,
+    currentStatus: String,
+    processingStats: List<FileConversionStats>?,
     onStartConversion: () -> Unit,
     onShowOptimizationDialog: () -> Unit,
     conversionStats: ConversionStats // NEW parameter
 ) {
+    println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  File conversion stats : ${processingStats.toString()}")
     if (isConverting) {
         // Show conversion dashboard during processing
         ConversionDashboard(
             folderStructure = folderStructure,
             mediaFiles = mediaFiles,
             conversionStats = conversionStats,
-            currentFile = currentFile,
-            conversionProgress = conversionProgress
+            currentStatus = currentStatus,
+            conversionProgress = conversionProgress,
+            processingStats = processingStats,
         )
     } else {
         // Show normal file browser when not converting
@@ -220,9 +210,13 @@ private fun ConversionDashboard(
     folderStructure: List<FolderNode>,
     mediaFiles: List<VideoFile>,
     conversionStats: ConversionStats,
-    currentFile: String,
-    conversionProgress: Float
+    currentStatus: String,
+    conversionProgress: Float,
+    processingStats:  List<FileConversionStats>? = null
 ) {
+    LaunchedEffect(processingStats) {
+        println("Processing stats : ${processingStats.toString()}")
+    }
     Row(modifier = Modifier.fillMaxSize()) {
         // Left side - Folder tree (smaller during conversion)
         Card(
@@ -275,8 +269,9 @@ private fun ConversionDashboard(
         // Right side - Statistics Panel (main focus during conversion)
         ConversionStatsPanel(
             stats = conversionStats,
-            currentFile = currentFile,
-            modifier = Modifier.weight(1f).padding(8.dp)
+            currentFile = currentStatus,
+            modifier = Modifier.weight(1f).padding(8.dp),
+            processingStats =  processingStats,
         )
     }
 }

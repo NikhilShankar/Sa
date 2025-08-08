@@ -1,5 +1,7 @@
 package com.ammakkutti.sa.presentation.convert
 
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import com.ammakkutti.sa.domain.model.ConversionHistory
 import com.ammakkutti.sa.domain.model.VideoFile
 import kotlinx.serialization.Serializable
@@ -12,7 +14,7 @@ data class ConvertState(
     val isScanning: Boolean = false,
     val isConverting: Boolean = false,
     val conversionProgress: Float = 0f,
-    val currentFile: String = "",
+    val currentStatus: String? = null,
     val sortBy: SortOption = SortOption.SIZE_DESC,
 
     // Optimization dialog state
@@ -21,6 +23,7 @@ data class ConvertState(
 
     // NEW: Detailed conversion statistics
     val conversionStats: ConversionStats = ConversionStats(),
+    val processingStats: MutableList<FileConversionStats> = arrayListOf<FileConversionStats>(),
 
     // NEW: Keep stats after completion
     val hasCompletedConversion: Boolean = false,
@@ -36,7 +39,6 @@ data class ConversionStats(
     val totalFiles: Int = 0,
     val completedFiles: Int = 0,
     val currentFileIndex: Int = 0,
-    val currentFileProgress: Float = 0f,
 
     // File being processed
     val currentFileStats: FileConversionStats? = null,
@@ -65,7 +67,8 @@ data class FileConversionStats(
     val videoDuration: Long = 0, // in seconds
     val videoResolution: String = "",
     val originalBitrate: Long = 0,
-    val compressedBitrate: Long = 0
+    val compressedBitrate: Long = 0,
+    val conversionProgress: Float = 0f
 )
 
 enum class ConversionStatus {
@@ -134,7 +137,7 @@ sealed class ConvertIntent {
 
     // NEW: Statistics tracking intents
     data class StartFileConversion(val fileStats: FileConversionStats) : ConvertIntent()
-    data class UpdateFileProgress(val progress: Float) : ConvertIntent()
+    data class UpdateFileProgress(val fileStats: FileConversionStats, val progress: Float) : ConvertIntent()
     data class CompleteFileConversion(val fileStats: FileConversionStats) : ConvertIntent()
     data class UpdateOverallStats(val stats: ConversionStats) : ConvertIntent()
 
